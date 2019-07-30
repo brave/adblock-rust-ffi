@@ -71,6 +71,7 @@ bool engine_match(C_Engine *engine,
                   const char *resource_type,
                   bool *explicit_cancel,
                   bool *saved_from_exception,
+                  char **filter,
                   char **redirect);
 
 /**

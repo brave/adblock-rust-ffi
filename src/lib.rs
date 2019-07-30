@@ -43,6 +43,7 @@ pub unsafe extern "C" fn engine_match(
     resource_type: *const c_char,
     explicit_cancel: *mut bool,
     saved_from_exception: *mut bool,
+    filter: *mut *mut c_char,
     redirect: *mut *mut c_char,
 ) -> bool {
     let url = CStr::from_ptr(url).to_str().unwrap();
@@ -60,6 +61,13 @@ pub unsafe extern "C" fn engine_match(
     );
     *explicit_cancel = blocker_result.explicit_cancel;
     *saved_from_exception = blocker_result.filter != None && blocker_result.exception != None;
+    *filter = match blocker_result.filter {
+        Some(x) => match CString::new(x) {
+            Ok(y) => y.into_raw(),
+            _ => ptr::null_mut(),
+        },
+        None => ptr::null_mut(),
+    };
     *redirect = match blocker_result.redirect {
         Some(x) => match CString::new(x) {
             Ok(y) => y.into_raw(),
