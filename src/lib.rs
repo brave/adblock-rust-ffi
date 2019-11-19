@@ -102,7 +102,7 @@ pub unsafe extern "C" fn engine_add_resource(
     let resource = Resource {
         name: key.to_string(),
         aliases: vec![],
-        kind: ResourceType::Mime(MimeType::from(content_type)),
+        kind: ResourceType::Mime(MimeType::from(std::borrow::Cow::from(content_type))),
         content: data.to_string(),
     };
     assert!(!engine.is_null());
