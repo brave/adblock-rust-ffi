@@ -2,3 +2,6 @@
 /target/
 **/*.rs.bk
 .gdb_history
+build/
+node_modules/
+out/

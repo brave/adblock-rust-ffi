@@ -17,6 +17,9 @@ source_set("adblock_ffi") {
   public_configs = [ ":external_config" ]
 
   sources = [
+    "src/addon.cc",
+    "src/ad_block_client_wrap.cc",
+    "src/ad_block_client_wrap.h",
     "src/wrapper.cpp",
     "src/wrapper.hpp"
   ]

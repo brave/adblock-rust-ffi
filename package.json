@@ -1,0 +1,28 @@
+{
+  "name": "adblock-rust-ffi",
+  "main": "./build/Release/adblock-rust",
+  "description": "Rust ad block engine used in the Brave browser.",
+  "scripts": {
+    "build": "cargo build",
+    "manifest": "node-gyp configure && node-gyp build",
+    "manifest-files": "node scripts/generateManifestFiles.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brave/adblock-rust-ffi.git"
+  },
+  "author": "Brian R. Bondy <netzen@gmail.com> (http://www.brianbondy.com)",
+  "license": "MPL-2.0",
+  "gypfile": true,
+  "bugs": {
+    "url": "https://github.com/brave/adblock-rust-ffi/issues"
+  },
+  "homepage": "https://github.com/brave/adblock-rust-ffi#readme",
+  "pre-commit": [
+    "lint-cpp",
+    "lint-js"
+  ],
+  "dependencies": {
+    "node-gyp": "^7.0.0"
+  }
+}

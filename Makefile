@@ -10,6 +10,8 @@ endif
 
 all: examples/cpp.out
 
+manifest: ./node_modules/.bin/node-gyp configure && ./node_modules/.bin/node-gyp build
+
 src/lib.h: src/lib.rs
 	cbindgen -o src/lib.h
 
@@ -33,6 +35,7 @@ valgrind: sample
 
 clean:
 	rm -rf target
+	rm -rf build
 
 lint:
 	cargo fmt -- --check
