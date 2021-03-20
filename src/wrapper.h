@@ -28,9 +28,11 @@ extern "C" {
 
 namespace adblock {
 
+#ifndef EMBEDDED_DOMAIN_RESOLVER
 typedef C_DomainResolverCallback DomainResolverCallback;
 
 bool ADBLOCK_EXPORT SetDomainResolver(DomainResolverCallback resolver);
+#endif
 
 class ADBLOCK_EXPORT FilterList {
  public:

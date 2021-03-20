@@ -8,9 +8,11 @@ extern "C" {
 
 namespace adblock {
 
+#ifndef EMBEDDED_DOMAIN_RESOLVER
 bool SetDomainResolver(DomainResolverCallback resolver) {
   return set_domain_resolver(resolver);
 }
+#endif
 
 std::vector<FilterList> FilterList::default_list;
 std::vector<FilterList> FilterList::regional_list;

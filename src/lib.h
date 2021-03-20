@@ -11,13 +11,16 @@
  */
 typedef struct C_Engine C_Engine;
 
+#if !defined(EMBEDDED_DOMAIN_RESOLVER)
 /**
  * An external callback that receives a hostname and two out-parameters for start and end
  * position. The callback should fill the start and end positions with the start and end indices
  * of the domain part of the hostname.
  */
 typedef void (*C_DomainResolverCallback)(const char*, uint32_t*, uint32_t*);
+#endif
 
+#if !defined(EMBEDDED_DOMAIN_RESOLVER)
 /**
  * Passes a callback to the adblock library, allowing it to be used for domain resolution.
  *
@@ -26,6 +29,7 @@ typedef void (*C_DomainResolverCallback)(const char*, uint32_t*, uint32_t*);
  * Returns true on success, false if a callback was already set previously.
  */
 bool set_domain_resolver(C_DomainResolverCallback resolver);
+#endif
 
 /**
  * Create a new `Engine`.
