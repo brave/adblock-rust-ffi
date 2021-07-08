@@ -400,7 +400,9 @@ void domainResolverImpl(const char* host, uint32_t* start, uint32_t* end) {
 }
 
 int main() {
+#ifndef EMBEDDED_DOMAIN_RESOLVER
   SetDomainResolver(domainResolverImpl);
+#endif
 
   TestBasics();
   TestDeserialization();

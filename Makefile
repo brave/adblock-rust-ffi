@@ -1,4 +1,5 @@
 CFLAGS :=
+CARGOFLAGS :=
 
 ifdef NDEBUG
 CFLAGS += -DNDEBUG=${NDEBUG}
@@ -6,6 +7,11 @@ endif
 
 ifdef NO_CXXEXCEPTIONS
 CFLAGS += -DNO_CXXEXCEPTIONS=${NO_CXXEXCEPTIONS}
+endif
+
+ifdef EMBEDDED_DOMAIN_RESOLVER
+CARGOFLAGS += --features=embedded-domain-resolver
+CFLAGS += -DEMBEDDED_DOMAIN_RESOLVER
 endif
 
 all: examples/cpp.out
@@ -23,7 +29,7 @@ examples/wrapper.o: src/lib.h src/wrapper.cc src/wrapper.h
 	g++ $(CFLAGS) -std=gnu++0x src/wrapper.cc -I src/ -c  -o examples/wrapper.o
 
 target/debug/libadblock.a: src/lib.rs Cargo.toml
-	cargo build
+	cargo build $(CARGOFLAGS)
 
 valgrind-supp: sample
 	valgrind --gen-suppressions=all --suppressions=.valgrind.supp  --leak-check=yes --error-exitcode=1 ./examples/cpp.out --gen-suppressions=all

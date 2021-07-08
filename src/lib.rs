@@ -10,6 +10,7 @@ use std::string::String;
 /// An external callback that receives a hostname and two out-parameters for start and end
 /// position. The callback should fill the start and end positions with the start and end indices
 /// of the domain part of the hostname.
+#[cfg(not(feature = "embedded-domain-resolver"))]
 pub type DomainResolverCallback = unsafe extern "C" fn(*const c_char, *mut u32, *mut u32);
 
 /// Passes a callback to the adblock library, allowing it to be used for domain resolution.
@@ -17,6 +18,7 @@ pub type DomainResolverCallback = unsafe extern "C" fn(*const c_char, *mut u32, 
 /// This is required to be able to use any adblocking functionality.
 ///
 /// Returns true on success, false if a callback was already set previously.
+#[cfg(not(feature = "embedded-domain-resolver"))]
 #[no_mangle]
 pub unsafe extern "C" fn set_domain_resolver(resolver: DomainResolverCallback) -> bool {
     struct RemoteResolverImpl {

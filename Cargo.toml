@@ -19,6 +19,7 @@ name = "adblock"
 
 [features]
 cbindgen = []
+embedded-domain-resolver = ["adblock/embedded-domain-resolver"]
 
 [profile.dev]
 panic = "abort"
