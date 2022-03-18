@@ -8,6 +8,7 @@ edition = "2018"
 adblock = { version = "~0.3.15", default-features = false, features = ["full-regex-handling", "object-pooling"] }
 serde_json = "1.0"
 libc = "0.2"
+regex = "1.5.5"
 
 [lib]
 crate-type = [
