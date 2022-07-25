@@ -1,3 +1,8 @@
+/* Copyright (c) 2019 The Brave Authors. All rights reserved.
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 #ifndef ADBLOCK_RUST_FFI_H
 #define ADBLOCK_RUST_FFI_H
 
@@ -10,6 +15,12 @@
  * Main adblocking engine that allows efficient querying of resources to block.
  */
 typedef struct C_Engine C_Engine;
+
+/**
+ * Includes information about any "special comments" as described by
+ * https://help.eyeo.com/adblockplus/how-to-write-filters#special-comments
+ */
+typedef struct C_FilterListMetadata C_FilterListMetadata;
 
 /**
  * An external callback that receives a hostname and two out-parameters for start and end
@@ -28,9 +39,32 @@ typedef void (*C_DomainResolverCallback)(const char*, uint32_t*, uint32_t*);
 bool set_domain_resolver(C_DomainResolverCallback resolver);
 
 /**
- * Create a new `Engine`.
+ * Create a new `Engine`, interpreting `data` as a C string and then parsing as a filter list in
+ * ABP syntax.
+ */
+struct C_Engine *engine_create_from_buffer(const char *data,
+                                           size_t data_size);
+
+/**
+ * Create a new `Engine`, interpreting `data` as a C string and then parsing as a filter list in
+ * ABP syntax. Also populates metadata from the filter list into `metadata`.
+ */
+struct C_Engine *engine_create_from_buffer_with_metadata(const char *data,
+                                                         size_t data_size,
+                                                         struct C_FilterListMetadata **metadata);
+
+/**
+ * Create a new `Engine`, interpreting `rules` as a null-terminated C string and then parsing as a
+ * filter list in ABP syntax.
  */
 struct C_Engine *engine_create(const char *rules);
+
+/**
+ * Create a new `Engine`, interpreting `rules` as a null-terminated C string and then parsing as a
+ * filter list in ABP syntax. Also populates metadata from the filter list into `metadata`.
+ */
+struct C_Engine *engine_create_with_metadata(const char *rules,
+                                             struct C_FilterListMetadata **metadata);
 
 /**
  * Checks if a `url` matches for the specified `Engine` within the context.
@@ -49,6 +83,17 @@ void engine_match(struct C_Engine *engine,
                   bool *did_match_exception,
                   bool *did_match_important,
                   char **redirect);
+
+/**
+ * Returns any CSP directives that should be added to a subdocument or document request's response
+ * headers.
+ */
+char *engine_get_csp_directives(struct C_Engine *engine,
+                                const char *url,
+                                const char *host,
+                                const char *tab_host,
+                                bool third_party,
+                                const char *resource_type);
 
 /**
  * Adds a tag to the engine for consideration
@@ -81,12 +126,31 @@ void engine_remove_tag(struct C_Engine *engine, const char *tag);
 /**
  * Deserializes a previously serialized data file list.
  */
-bool engine_deserialize(struct C_Engine *engine, const char *data, size_t data_size);
+bool engine_deserialize(struct C_Engine *engine,
+                        const char *data,
+                        size_t data_size);
 
 /**
  * Destroy a `Engine` once you are done with it.
  */
 void engine_destroy(struct C_Engine *engine);
+
+/**
+ * Puts a pointer to the homepage of the `FilterListMetadata` into `homepage`. Returns `true` if a homepage was returned.
+ */
+bool filter_list_metadata_homepage(const struct C_FilterListMetadata *metadata,
+                                   char **homepage);
+
+/**
+ * Puts a pointer to the title of the `FilterListMetadata` into `title`. Returns `true` if a title was returned.
+ */
+bool filter_list_metadata_title(const struct C_FilterListMetadata *metadata,
+                                char **title);
+
+/**
+ * Destroy a `FilterListMetadata` once you are done with it.
+ */
+void filter_list_metadata_destroy(struct C_FilterListMetadata *metadata);
 
 /**
  * Destroy a `*c_char` once you are done with it.
@@ -96,7 +160,8 @@ void c_char_buffer_destroy(char *s);
 /**
  * Returns a set of cosmetic filtering resources specific to the given url, in JSON format
  */
-char *engine_url_cosmetic_resources(struct C_Engine *engine, const char *url);
+char *engine_url_cosmetic_resources(struct C_Engine *engine,
+                                    const char *url);
 
 /**
  * Returns a stylesheet containing all generic cosmetic rules that begin with any of the provided class and id selectors

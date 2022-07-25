@@ -1,5 +1,7 @@
+use adblock::blocker::Redirection;
 use adblock::engine::Engine;
-use adblock::resources::{Resource, ResourceType, MimeType};
+use adblock::lists::FilterListMetadata;
+use adblock::resources::{MimeType, Resource, ResourceType};
 use core::ptr;
 use libc::size_t;
 use std::ffi::CStr;
@@ -38,17 +40,77 @@ pub unsafe extern "C" fn set_domain_resolver(resolver: DomainResolverCallback) -
         }
     }
 
-    adblock::url_parser::set_domain_resolver(Box::new(RemoteResolverImpl { remote_callback: resolver })).is_ok()
+    adblock::url_parser::set_domain_resolver(Box::new(RemoteResolverImpl {
+        remote_callback: resolver,
+    }))
+    .is_ok()
 }
 
-/// Create a new `Engine`.
+/// Create a new `Engine`, interpreting `data` as a C string and then parsing as a filter list in
+/// ABP syntax.
+#[no_mangle]
+pub unsafe extern "C" fn engine_create_from_buffer(
+    data: *const c_char,
+    data_size: size_t,
+) -> *mut Engine {
+    let data: &[u8] = std::slice::from_raw_parts(data as *const u8, data_size);
+    let rules = std::str::from_utf8(data).unwrap_or_else(|_| {
+        eprintln!("Failed to parse filter list with invalid UTF-8 content");
+        ""
+    });
+    engine_create_from_str(rules).1
+}
+
+/// Create a new `Engine`, interpreting `data` as a C string and then parsing as a filter list in
+/// ABP syntax. Also populates metadata from the filter list into `metadata`.
+#[no_mangle]
+pub unsafe extern "C" fn engine_create_from_buffer_with_metadata(
+    data: *const c_char,
+    data_size: size_t,
+    metadata: *mut *mut FilterListMetadata,
+) -> *mut Engine {
+    let data: &[u8] = std::slice::from_raw_parts(data as *const u8, data_size);
+    let rules = std::str::from_utf8(data).unwrap_or_else(|_| {
+        eprintln!("Failed to parse filter list with invalid UTF-8 content");
+        ""
+    });
+    let (metadata_ptr, engine_ptr) = engine_create_from_str(rules);
+    *metadata = metadata_ptr;
+    engine_ptr
+}
+
+/// Create a new `Engine`, interpreting `rules` as a null-terminated C string and then parsing as a
+/// filter list in ABP syntax.
 #[no_mangle]
 pub unsafe extern "C" fn engine_create(rules: *const c_char) -> *mut Engine {
-    let rules = CStr::from_ptr(rules).to_str().unwrap();
+    let rules = CStr::from_ptr(rules).to_str().unwrap_or_else(|_| {
+        eprintln!("Failed to parse filter list with invalid UTF-8 content");
+        ""
+    });
+    engine_create_from_str(rules).1
+}
+
+/// Create a new `Engine`, interpreting `rules` as a null-terminated C string and then parsing as a
+/// filter list in ABP syntax. Also populates metadata from the filter list into `metadata`.
+#[no_mangle]
+pub unsafe extern "C" fn engine_create_with_metadata(rules: *const c_char, metadata: *mut *mut FilterListMetadata) -> *mut Engine {
+    let rules = CStr::from_ptr(rules).to_str().unwrap_or_else(|_|{
+        eprintln!("Failed to parse filter list with invalid UTF-8 content");
+        ""
+    });
+    let (metadata_ptr, engine_ptr) = engine_create_from_str(rules);
+    *metadata = metadata_ptr;
+    engine_ptr
+}
+
+fn engine_create_from_str(rules: &str) -> (*mut FilterListMetadata, *mut Engine) {
     let mut filter_set = adblock::lists::FilterSet::new(false);
-    filter_set.add_filter_list(&rules, adblock::lists::FilterFormat::Standard);
+    let metadata = filter_set.add_filter_list(&rules, Default::default());
     let engine = Engine::from_filter_set(filter_set, true);
-    Box::into_raw(Box::new(engine))
+    (
+        Box::into_raw(Box::new(metadata)),
+        Box::into_raw(Box::new(engine)),
+    )
 }
 
 /// Checks if a `url` matches for the specified `Engine` within the context.
@@ -90,12 +152,40 @@ pub unsafe extern "C" fn engine_match(
     *did_match_exception |= blocker_result.exception.is_some();
     *did_match_important |= blocker_result.important;
     *redirect = match blocker_result.redirect {
-        Some(x) => match CString::new(x) {
+        Some(Redirection::Resource(x)) => match CString::new(x) {
             Ok(y) => y.into_raw(),
             _ => ptr::null_mut(),
         },
+        // Ignore `redirect-url` for now.
+        Some(Redirection::Url(_)) => ptr::null_mut(),
         None => ptr::null_mut(),
     };
+}
+
+/// Returns any CSP directives that should be added to a subdocument or document request's response
+/// headers.
+#[no_mangle]
+pub unsafe extern "C" fn engine_get_csp_directives(
+    engine: *mut Engine,
+    url: *const c_char,
+    host: *const c_char,
+    tab_host: *const c_char,
+    third_party: bool,
+    resource_type: *const c_char,
+) -> *mut c_char {
+    let url = CStr::from_ptr(url).to_str().unwrap();
+    let host = CStr::from_ptr(host).to_str().unwrap();
+    let tab_host = CStr::from_ptr(tab_host).to_str().unwrap();
+    let resource_type = CStr::from_ptr(resource_type).to_str().unwrap();
+    assert!(!engine.is_null());
+    let engine = Box::leak(Box::from_raw(engine));
+    if let Some(directive) =
+        engine.get_csp_directives(url, host, tab_host, resource_type, Some(third_party))
+    {
+        CString::new(directive).expect("Error: CString::new()").into_raw()
+    } else {
+        CString::new("").expect("Error: CString::new()").into_raw()
+    }
 }
 
 /// Adds a tag to the engine for consideration
@@ -185,6 +275,48 @@ pub unsafe extern "C" fn engine_destroy(engine: *mut Engine) {
     }
 }
 
+/// Puts a pointer to the homepage of the `FilterListMetadata` into `homepage`. Returns `true` if a homepage was returned.
+#[no_mangle]
+pub unsafe extern "C" fn filter_list_metadata_homepage(metadata: *const FilterListMetadata, homepage: *mut *mut c_char) -> bool {
+    if let Some(this_homepage) = (*metadata).homepage.as_ref() {
+        let cstring = CString::new(this_homepage.as_str());
+        match cstring {
+            Ok(cstring) => {
+                *homepage = cstring.into_raw();
+                true
+            }
+            Err(_) => false,
+        }
+    } else {
+        false
+    }
+}
+
+/// Puts a pointer to the title of the `FilterListMetadata` into `title`. Returns `true` if a title was returned.
+#[no_mangle]
+pub unsafe extern "C" fn filter_list_metadata_title(metadata: *const FilterListMetadata, title: *mut *mut c_char) -> bool {
+    if let Some(this_title) = (*metadata).title.as_ref() {
+        let cstring = CString::new(this_title.as_str());
+        match cstring {
+            Ok(cstring) => {
+                *title = cstring.into_raw();
+                true
+            }
+            Err(_) => false,
+        }
+    } else {
+        false
+    }
+}
+
+/// Destroy a `FilterListMetadata` once you are done with it.
+#[no_mangle]
+pub unsafe extern "C" fn filter_list_metadata_destroy(metadata: *mut FilterListMetadata) {
+    if !metadata.is_null() {
+        drop(Box::from_raw(metadata));
+    }
+}
+
 /// Destroy a `*c_char` once you are done with it.
 #[no_mangle]
 pub unsafe extern "C" fn c_char_buffer_destroy(s: *mut c_char) {
@@ -202,12 +334,11 @@ pub unsafe extern "C" fn engine_url_cosmetic_resources(
     let url = CStr::from_ptr(url).to_str().unwrap();
     assert!(!engine.is_null());
     let engine = Box::leak(Box::from_raw(engine));
-    let ptr = CString::new(serde_json::to_string(&engine.url_cosmetic_resources(url))
-        .unwrap_or_else(|_| "".into()))
-        .expect("Error: CString::new()")
-        .into_raw();
-    std::mem::forget(ptr);
-    ptr
+    CString::new(
+        serde_json::to_string(&engine.url_cosmetic_resources(url)).unwrap_or_else(|_| "".into()),
+    )
+    .expect("Error: CString::new()")
+    .into_raw()
 }
 
 /// Returns a stylesheet containing all generic cosmetic rules that begin with any of the provided class and id selectors
@@ -238,5 +369,7 @@ pub unsafe extern "C" fn engine_hidden_class_id_selectors(
     assert!(!engine.is_null());
     let engine = Box::leak(Box::from_raw(engine));
     let stylesheet = engine.hidden_class_id_selectors(&classes, &ids, &exceptions);
-    CString::new(serde_json::to_string(&stylesheet).unwrap_or_else(|_| "".into())).expect("Error: CString::new()").into_raw()
+    CString::new(serde_json::to_string(&stylesheet).unwrap_or_else(|_| "".into()))
+        .expect("Error: CString::new()")
+        .into_raw()
 }

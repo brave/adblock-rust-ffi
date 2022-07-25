@@ -149,7 +149,14 @@ void TestDeserialization() {
   Engine engine4("");
   engine4.deserialize(reinterpret_cast<const char*>(ad_banner_with_resources_abc_dat_buffer),
       sizeof(ad_banner_with_resources_abc_dat_buffer)/sizeof(ad_banner_with_resources_abc_dat_buffer[0]));
-  Check(true, false, false, "data:text/plain;base64,", "Basic match after deserialization with resources", engine4, "http://example.com/ad-banner.gif",
+
+  // This serialized DAT was generated prior to
+  // https://github.com/brave/adblock-rust/pull/185, so the `redirect` filter did not get
+  // duplicated into the list of blocking filters.
+  //
+  // TODO - The failure to match here is considered acceptable for now, as it's part of a
+  // breaking change (minor version bump). However, the test should be updated at some point.
+  Check(false, false, false, "data:text/plain;base64,", "Basic match after deserialization with resources", engine4, "http://example.com/ad-banner.gif",
       "example.com", "example.com", false , "image");
 }
 
@@ -346,11 +353,11 @@ void TestCosmeticScriptletResources() {
   )");
 
   std::string a_loaded = engine.urlCosmeticResources("https://a.com");
-  std::string a_loaded_result(R"({"hide_selectors":[],"style_selectors":{},"exceptions":[],"injected_script":"console.log(\"Hi\");\n","generichide":false})");
+  std::string a_loaded_result(R"({"hide_selectors":[],"style_selectors":{},"exceptions":[],"injected_script":"try {\nconsole.log(\"Hi\");\n} catch ( e ) { }\n","generichide":false})");
   assert(a_loaded == a_loaded_result);
 
   std::string a2_loaded = engine.urlCosmeticResources("https://2.a.com");
-  std::string a2_loaded_result(R"({"hide_selectors":[],"style_selectors":{},"exceptions":[],"injected_script":"console.log(\"Hi\");\nwindow.location.href = \"argument\"\n","generichide":false})");
+  std::string a2_loaded_result(R"({"hide_selectors":[],"style_selectors":{},"exceptions":[],"injected_script":"try {\nconsole.log(\"Hi\");\n} catch ( e ) { }\ntry {\nwindow.location.href = \"argument\"\n} catch ( e ) { }\n","generichide":false})");
   assert(a2_loaded == a2_loaded_result);
 }
 
