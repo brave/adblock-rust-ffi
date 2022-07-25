@@ -17,10 +17,10 @@ sample: examples/cpp.out
 	./examples/cpp.out
 
 examples/cpp.out: target/debug/libadblock.a examples/wrapper.o examples/cpp/main.cc
-	g++ $(CFLAGS) -std=gnu++0x examples/cpp/main.cc examples/wrapper.o ./target/debug/libadblock.a -I ./src -lpthread -ldl -o examples/cpp.out
+	g++ $(CFLAGS) -std=c++17 examples/cpp/main.cc examples/wrapper.o ./target/debug/libadblock.a -I ./src -lpthread -ldl -o examples/cpp.out
 
 examples/wrapper.o: src/lib.h src/wrapper.cc src/wrapper.h
-	g++ $(CFLAGS) -std=gnu++0x src/wrapper.cc -I src/ -c  -o examples/wrapper.o
+	g++ $(CFLAGS) -std=c++17 src/wrapper.cc -I src/ -c  -o examples/wrapper.o
 
 target/debug/libadblock.a: src/lib.rs Cargo.toml
 	cargo build
